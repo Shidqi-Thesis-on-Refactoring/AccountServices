@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { auth, adminAuth } = require("../../middlewares/auth");
-const permissions_controller = require("./../../controllers/permissionsController");
+const permissions_controller = require("./../../controllers/permissionController");
 
 // @route   GET api/permissions/allUsers
 // @desc    Get all users

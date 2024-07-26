@@ -1,4 +1,4 @@
-const Shipper = require("./../models/Shipper");
+const Shipper = require("./../models/ShipperModels");
 const User = require("./../models/UsersModel");
 
 const mongoose = require("mongoose");

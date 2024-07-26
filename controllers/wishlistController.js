@@ -1,4 +1,5 @@
 const Wishlist = require("./../models/WishlistModel");
+const Product = require("../models/ProductModel");
 
 // handle get request at "/api/wishlist/addToWishlist?productId="
 exports.addToWishlist = (req, res) => {
@@ -43,7 +44,7 @@ exports.userWishlist = (req, res) => {
     .populate("items.product")
     .exec((err, wishlist) => {
       if (err) {
-        res.status(400).json({ message: "Couldn't find wish List", err });
+        res.status(400).json({ message: `Couldn't find wish List. ${err}`, err });
       } else {
         if (!wishlist) {
           res.status(400).json({ message: "no wish List" });

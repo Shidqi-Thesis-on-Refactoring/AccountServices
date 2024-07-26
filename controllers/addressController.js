@@ -1,4 +1,4 @@
-const Address = require("./../models/Addresses");
+const Address = require("./../models/AddressesModels");
 const { body, validationResult } = require("express-validator");
 
 //handle POST at api/users/addresses?action=add to add a new address

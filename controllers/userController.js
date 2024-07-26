@@ -26,21 +26,26 @@ exports.createUser = (req, res) => {
   // 2- Check is the email name is taken
   // 3- verify the password
   // 4- encrypt the password and save the new user
-
+  
   // 1- check if the Username is already taken
   // throw a message to the user if so
   function checkUsernameTaken() {
-    User.findOne({ username: req.body.username }, (err, userWithSameUsername) => {
-      if (err) {
-        return res.status(400).json({
-          message: "Error getting username"
-        });
-      } else if (userWithSameUsername) {
-        return res.status(400).json({ message: "Username is taken" });
-      } else {
-        checkEmailTaken();
-      }
-    });
+    try {
+      User.findOne({ username: req.body.username }, (err, userWithSameUsername) => {
+        if (err) {
+          return res.status(400).json({
+            message: "Error getting username"
+          });
+        } else if (userWithSameUsername) {
+          return res.status(400).json({ message: "Username is taken" });
+        } else {
+          checkEmailTaken();
+        }
+      })
+    } catch (err) {
+      console.log(err);
+      res.status(500).json({ message : err});
+    };
   }
   // 2- check if the email address is already taken
   // throw a message to the user if so
@@ -216,9 +221,14 @@ exports.login = (req, res) => {
 
 // handle get request at "/api/users/user"
 exports.getUser = (req, res) => {
-  User.findById(req.user.id)
-    .select("-password")
-    .then(user => res.json(user));
+  try{
+    User.findById(req.user.id)
+      .select("-password")
+      .then(user => res.json(user));
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({message : err})
+  }
 };
 
 // handle PUT at api/users/edit_account to edit user data
@@ -263,91 +273,92 @@ exports.editUser = (req, res) => {
               return res.status(400).json({ message: "Password doesn't match" });
             }
             // generate a hashed password
-            bcrypt.genSalt(10, (err, salt) => {
-              if (err) throw err;
-              // if the user doesn't change the password we keep updating without touching the password
-              if (req.body.password === "") {
-                User.findByIdAndUpdate(req.user.id, updatedUser, {
-                  new: true,
-                  useFindAndModify: false
-                })
-                  .select("-password")
-                  .then(user => {
-                    // in case the user switched the account to a seller account
-                    // we need to generate a new token with the new seller auth
-                    jwt.sign(
-                      {
-                        id: user.id,
-                        isAdmin: user.isAdmin,
-                        isSeller: user.isSeller,
-                        isCustomer: user.isCustomer,
-                        isShipper: user.isShipper,
-                        isRestricted: user.isRestricted
-                      },
-                      jwtSecret,
-                      { expiresIn: 3600 },
-                      (err, token) => {
-                        if (err) throw err;
-                        res.status(200).json({
-                          token,
-                          message: "Account settings updated",
-                          user
-                        });
-                      }
-                    );
-                  })
-                  .catch(err => {
-                    res.status(400).json({
-                      message: "Couldn't update",
-                      err
-                    });
-                  });
-                // if the user changes the password we hash the new password
-                // and change its value in the new user object with data
-              } else {
-                bcrypt.hash(updatedUser.password, salt, (err, hash) => {
-                  if (err) throw err;
+            genHashedPassword(req, updatedUser, res);
+            // bcrypt.genSalt(10, (err, salt) => {
+            //   if (err) throw err;
+            //   // if the user doesn't change the password we keep updating without touching the password
+            //   if (req.body.password === "") {
+            //     User.findByIdAndUpdate(req.user.id, updatedUser, {
+            //       new: true,
+            //       useFindAndModify: false
+            //     })
+            //       .select("-password")
+            //       .then(user => {
+            //         // in case the user switched the account to a seller account
+            //         // we need to generate a new token with the new seller auth
+            //         jwt.sign(
+            //           {
+            //             id: user.id,
+            //             isAdmin: user.isAdmin,
+            //             isSeller: user.isSeller,
+            //             isCustomer: user.isCustomer,
+            //             isShipper: user.isShipper,
+            //             isRestricted: user.isRestricted
+            //           },
+            //           jwtSecret,
+            //           { expiresIn: 3600 },
+            //           (err, token) => {
+            //             if (err) throw err;
+            //             res.status(200).json({
+            //               token,
+            //               message: "Account settings updated",
+            //               user
+            //             });
+            //           }
+            //         );
+            //       })
+            //       .catch(err => {
+            //         res.status(400).json({
+            //           message: "Couldn't update",
+            //           err
+            //         });
+            //       });
+            //     // if the user changes the password we hash the new password
+            //     // and change its value in the new user object with data
+            //   } else {
+            //     bcrypt.hash(updatedUser.password, salt, (err, hash) => {
+            //       if (err) throw err;
 
-                  updatedUser.password = hash;
+            //       updatedUser.password = hash;
 
-                  User.findByIdAndUpdate(req.user.id, updatedUser, {
-                    new: true,
-                    useFindAndModify: false
-                  })
-                    .select("-password")
-                    .then(user => {
-                      // in case the user switched the account to a seller account
-                      // we need to generate a new token with the new seller auth
-                      jwt.sign(
-                        {
-                          id: user.id,
-                          isAdmin: user.isAdmin,
-                          isSeller: user.isSeller,
-                          isCustomer: user.isCustomer,
-                          isShipper: user.isShipper,
-                          isRestricted: user.isRestricted
-                        },
-                        jwtSecret,
-                        { expiresIn: 3600 },
-                        (err, token) => {
-                          if (err) throw err;
-                          res.status(200).json({
-                            token,
-                            message: "Account settings updated",
-                            user
-                          });
-                        }
-                      );
-                    })
-                    .catch(err => {
-                      res.status(400).json({
-                        message: "Couldn't update",
-                        err
-                      });
-                    });
-                });
-              }
-            });
+            //       User.findByIdAndUpdate(req.user.id, updatedUser, {
+            //         new: true,
+            //         useFindAndModify: false
+            //       })
+            //         .select("-password")
+            //         .then(user => {
+            //           // in case the user switched the account to a seller account
+            //           // we need to generate a new token with the new seller auth
+            //           jwt.sign(
+            //             {
+            //               id: user.id,
+            //               isAdmin: user.isAdmin,
+            //               isSeller: user.isSeller,
+            //               isCustomer: user.isCustomer,
+            //               isShipper: user.isShipper,
+            //               isRestricted: user.isRestricted
+            //             },
+            //             jwtSecret,
+            //             { expiresIn: 3600 },
+            //             (err, token) => {
+            //               if (err) throw err;
+            //               res.status(200).json({
+            //                 token,
+            //                 message: "Account settings updated",
+            //                 user
+            //               });
+            //             }
+            //           );
+            //         })
+            //         .catch(err => {
+            //           res.status(400).json({
+            //             message: "Couldn't update",
+            //             err
+            //           });
+            //         });
+            //     });
+            //   }
+            // });
           }
         });
       } else {
@@ -376,92 +387,93 @@ exports.editUser = (req, res) => {
               } else if (userWithSameUsername) {
                 res.status(400).json({ message: "Username is taken" });
               } else {
-                bcrypt.genSalt(10, (err, salt) => {
-                  if (err) throw err;
+                genHashedPassword(req, updatedUser, res);
+                // bcrypt.genSalt(10, (err, salt) => {
+                //   if (err) throw err;
 
-                  // if the user doesn't change the password we jeep updating without touching the password
-                  if (req.body.password === "") {
-                    User.findByIdAndUpdate(req.user.id, updatedUser, {
-                      new: true,
-                      useFindAndModify: false
-                    })
-                      .select("-password")
-                      .then(user => {
-                        // in case the user switched the account to a seller account
-                        // we need to generate a new token with the new seller auth
-                        jwt.sign(
-                          {
-                            id: user.id,
-                            isAdmin: user.isAdmin,
-                            isSeller: user.isSeller,
-                            isCustomer: user.isCustomer,
-                            isShipper: user.isShipper,
-                            isRestricted: user.isRestricted
-                          },
-                          jwtSecret,
-                          { expiresIn: 3600 },
-                          (err, token) => {
-                            if (err) throw err;
-                            res.status(200).json({
-                              token,
-                              message: "Account settings updated",
-                              user
-                            });
-                          }
-                        );
-                      })
-                      .catch(err => {
-                        res.status(400).json({
-                          message: "Couldn't update",
-                          err
-                        });
-                      });
-                    // if the user changes the password we hash the new password
-                    // and change its value in the new user object with data
-                  } else {
-                    bcrypt.hash(updatedUser.password, salt, (err, hash) => {
-                      if (err) throw err;
+                //   // if the user doesn't change the password we jeep updating without touching the password
+                //   if (req.body.password === "") {
+                //     User.findByIdAndUpdate(req.user.id, updatedUser, {
+                //       new: true,
+                //       useFindAndModify: false
+                //     })
+                //       .select("-password")
+                //       .then(user => {
+                //         // in case the user switched the account to a seller account
+                //         // we need to generate a new token with the new seller auth
+                //         jwt.sign(
+                //           {
+                //             id: user.id,
+                //             isAdmin: user.isAdmin,
+                //             isSeller: user.isSeller,
+                //             isCustomer: user.isCustomer,
+                //             isShipper: user.isShipper,
+                //             isRestricted: user.isRestricted
+                //           },
+                //           jwtSecret,
+                //           { expiresIn: 3600 },
+                //           (err, token) => {
+                //             if (err) throw err;
+                //             res.status(200).json({
+                //               token,
+                //               message: "Account settings updated",
+                //               user
+                //             });
+                //           }
+                //         );
+                //       })
+                //       .catch(err => {
+                //         res.status(400).json({
+                //           message: "Couldn't update",
+                //           err
+                //         });
+                //       });
+                //     // if the user changes the password we hash the new password
+                //     // and change its value in the new user object with data
+                //   } else {
+                //     bcrypt.hash(updatedUser.password, salt, (err, hash) => {
+                //       if (err) throw err;
 
-                      updatedUser.password = hash;
+                //       updatedUser.password = hash;
 
-                      User.findByIdAndUpdate(req.user.id, updatedUser, {
-                        new: true,
-                        useFindAndModify: false
-                      })
-                        .select("-password")
-                        .then(user => {
-                          // in case the user switched the account to a seller account
-                          // we need to generate a new token with the new seller auth
-                          jwt.sign(
-                            {
-                              id: user.id,
-                              isAdmin: user.isAdmin,
-                              isSeller: user.isSeller,
-                              isCustomer: user.isCustomer,
-                              isShipper: user.isShipper,
-                              isRestricted: user.isRestricted
-                            },
-                            jwtSecret,
-                            { expiresIn: 3600 },
-                            (err, token) => {
-                              if (err) throw err;
-                              res.status(200).json({
-                                token,
-                                message: "Account settings updated",
-                                user
-                              });
-                            }
-                          );
-                        })
-                        .catch(err => {
-                          res.status(400).json({
-                            message: "Couldn't update",
-                            err
-                          });
-                        });
-                    });
-                  }
-                });
+                //       User.findByIdAndUpdate(req.user.id, updatedUser, {
+                //         new: true,
+                //         useFindAndModify: false
+                //       })
+                //         .select("-password")
+                //         .then(user => {
+                //           // in case the user switched the account to a seller account
+                //           // we need to generate a new token with the new seller auth
+                //           jwt.sign(
+                //             {
+                //               id: user.id,
+                //               isAdmin: user.isAdmin,
+                //               isSeller: user.isSeller,
+                //               isCustomer: user.isCustomer,
+                //               isShipper: user.isShipper,
+                //               isRestricted: user.isRestricted
+                //             },
+                //             jwtSecret,
+                //             { expiresIn: 3600 },
+                //             (err, token) => {
+                //               if (err) throw err;
+                //               res.status(200).json({
+                //                 token,
+                //                 message: "Account settings updated",
+                //                 user
+                //               });
+                //             }
+                //           );
+                //         })
+                //         .catch(err => {
+                //           res.status(400).json({
+                //             message: "Couldn't update",
+                //             err
+                //           });
+                //         });
+                //     });
+                //   }
+                // });
               }
             });
           }
@@ -470,3 +482,92 @@ exports.editUser = (req, res) => {
     }
   });
 };
+
+const genHashedPassword = (req, updatedUser, res) => {
+    bcrypt.genSalt(10, (err, salt) => {
+        if (err) throw err;
+        // if the user doesn't change the password we keep updating without touching the password
+        if (req.body.password === "") {
+          User.findByIdAndUpdate(req.user.id, updatedUser, {
+            new: true,
+            useFindAndModify: false
+          })
+            .select("-password")
+            .then(user => {
+              // in case the user switched the account to a seller account
+              // we need to generate a new token with the new seller auth
+              jwt.sign(
+                {
+                  id: user.id,
+                  isAdmin: user.isAdmin,
+                  isSeller: user.isSeller,
+                  isCustomer: user.isCustomer,
+                  isShipper: user.isShipper,
+                  isRestricted: user.isRestricted
+                },
+                jwtSecret,
+                { expiresIn: 3600 },
+                (err, token) => {
+                  if (err) throw err;
+                  res.status(200).json({
+                    token,
+                    message: "Account settings updated",
+                    user
+                  });
+                }
+              );
+            })
+            .catch(err => {
+              res.status(400).json({
+                message: "Couldn't update",
+                err
+              });
+            });
+          // if the user changes the password we hash the new password
+          // and change its value in the new user object with data
+        } else {
+          bcrypt.hash(updatedUser.password, salt, (err, hash) => {
+            if (err) throw err;
+
+            updatedUser.password = hash;
+
+            User.findByIdAndUpdate(req.user.id, updatedUser, {
+              new: true,
+              useFindAndModify: false
+            })
+              .select("-password")
+              .then(user => {
+                // in case the user switched the account to a seller account
+                // we need to generate a new token with the new seller auth
+                jwt.sign(
+                  {
+                    id: user.id,
+                    isAdmin: user.isAdmin,
+                    isSeller: user.isSeller,
+                    isCustomer: user.isCustomer,
+                    isShipper: user.isShipper,
+                    isRestricted: user.isRestricted
+                  },
+                  jwtSecret,
+                  { expiresIn: 3600 },
+                  (err, token) => {
+                    if (err) throw err;
+                    res.status(200).json({
+                      token,
+                      message: "Account settings updated",
+                      user
+                    });
+                  }
+                );
+              })
+              .catch(err => {
+                res.status(400).json({
+                  message: "Couldn't update",
+                  err
+                });
+              });
+          });
+        }
+      });
+}
+
